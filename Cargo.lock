@@ -6,6 +6,7 @@ version = 4
 name = "SkelForm"
 version = "0.8.1"
 dependencies = [
+ "ab_glyph",
  "backtrace",
  "bytemuck",
  "console_error_panic_hook",

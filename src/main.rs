@@ -217,6 +217,7 @@ fn init_shared(shared: &mut Shared) {
     let bytes = include_bytes!("../assets/i18n/en.json").as_slice();
     let en: serde_json::Value = serde_json::from_slice(bytes).unwrap();
     shared.ui.init_default_lang(en);
+    skelform_lib::startup_window::restore_language(&mut shared.ui, &shared.config);
 }
 
 #[cfg(not(target_arch = "wasm32"))]

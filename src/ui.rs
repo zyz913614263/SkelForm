@@ -159,7 +159,7 @@ pub fn draw(
         settings_modal::draw(shared_ui, config, camera, events, context);
     }
     if shared_ui.startup_window {
-        startup_window::startup_modal(context, shared_ui, events, &config);
+        startup_window::startup_modal(context, shared_ui, events, config);
     }
     if shared_ui.donating_modal {
         modal::donating_modal(context, shared_ui, &config);
@@ -2069,6 +2069,67 @@ fn camera_bar(
         shared_ui.camera_bar.expanded = hovered || ui.ui_contains_pointer();
         shared_ui.camera_bar.scale = ui.min_rect().size().into();
     });
+}
+
+/// egui's built-in fonts have no CJK glyphs, so Chinese text renders as boxes.
+/// Install a system font as the last fallback and keep the default Latin font.
+pub fn install_cjk_font(ctx: &Context) {
+    #[cfg(target_arch = "wasm32")]
+    let _ = ctx;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let Some(data) = cjk_font_data() else {
+            return;
+        };
+        ctx.add_font(egui::epaint::text::FontInsert::new(
+            "cjk",
+            data,
+            vec![
+                egui::epaint::text::InsertFontFamily {
+                    family: egui::FontFamily::Proportional,
+                    priority: egui::epaint::text::FontPriority::Lowest,
+                },
+                egui::epaint::text::InsertFontFamily {
+                    family: egui::FontFamily::Monospace,
+                    priority: egui::epaint::text::FontPriority::Lowest,
+                },
+            ],
+        ));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn cjk_font_data() -> Option<egui::FontData> {
+    // (path, face index). First file that parses and contains 简 is used.
+    let candidates = [
+        ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0),
+        ("/System/Library/Fonts/STHeiti Light.ttc", 0),
+        ("/Library/Fonts/Arial Unicode.ttf", 0),
+        ("C:\\Windows\\Fonts\\msyh.ttc", 0),
+        ("C:\\Windows\\Fonts\\msyh.ttf", 0),
+        ("C:\\Windows\\Fonts\\simhei.ttf", 0),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 0),
+        ("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", 0),
+        ("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc", 0),
+        ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0),
+    ];
+
+    for (path, index) in candidates {
+        let Ok(bytes) = std::fs::read(path) else {
+            continue;
+        };
+        let parsed = ab_glyph::FontRef::try_from_slice_and_index(&bytes, index);
+        let Ok(font) = parsed else {
+            continue;
+        };
+        if ab_glyph::Font::glyph_id(&font, '简').0 == 0 {
+            continue;
+        }
+        let mut data = egui::FontData::from_owned(bytes);
+        data.index = index;
+        return Some(data);
+    }
+    None
 }
 
 /// Default styling to apply across all UI.

@@ -161,6 +161,7 @@ impl ApplicationHandler for App {
             gui_context.options_mut(|op| {
                 op.zoom_with_keyboard = false;
             });
+            ui::install_cjk_font(&gui_context);
 
             #[cfg(target_arch = "wasm32")]
             {

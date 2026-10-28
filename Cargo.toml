@@ -41,6 +41,7 @@ opt-level = 3
 pollster = "0.4.0"
 egui-winit = "0.33.0"
 rfd = { version = "0.15.3",  features = ["gtk3"], default-features = false}
+ab_glyph = "0.2.32"
 zip = { version = "4.0.0" }
 directories-next = "2.0.0" # for common dirs like config & temp data
 open = "5.3.2" # open links or folders

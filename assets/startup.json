@@ -37,6 +37,10 @@
         {
           "code": "English",
           "url": "en.json"
+        },
+        {
+          "code": "简体中文",
+          "url": "zh-cn.json"
         }
       ]
     }

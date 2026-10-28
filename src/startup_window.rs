@@ -9,11 +9,79 @@ const SKELA_SKF: &str = "_skellina.skf";
 #[cfg(target_arch = "wasm32")]
 const LANG_BASE: &str = "https://github.com/Retropaint/SkelForm/tree/master/assets/i18n/";
 
+/// Release builds keep i18n next to the executable. `cargo run` does not, so also
+/// look in the source tree and the current directory.
+#[cfg(not(target_arch = "wasm32"))]
+fn read_i18n(filename: &str) -> Option<Vec<u8>> {
+    let mut paths = vec![
+        utils::bin_path().join("assets").join("i18n").join(filename),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join("i18n")
+            .join(filename),
+    ];
+    if let Ok(cwd) = std::env::current_dir() {
+        paths.push(cwd.join("assets").join("i18n").join(filename));
+    }
+    for path in paths {
+        if let Ok(bytes) = std::fs::read(path) {
+            return Some(bytes);
+        }
+    }
+    None
+}
+
+/// Release builds keep samples next to the executable. `cargo run` does not.
+#[cfg(not(target_arch = "wasm32"))]
+fn sample_path(filename: &str) -> PathBuf {
+    let mut paths = vec![
+        utils::bin_path().join("samples").join(filename),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("samples")
+            .join(filename),
+    ];
+    if let Ok(cwd) = std::env::current_dir() {
+        paths.push(cwd.join("samples").join(filename));
+    }
+    for path in &paths {
+        if path.exists() {
+            return path.clone();
+        }
+    }
+    paths.remove(0)
+}
+
+/// Apply a saved language file. Missing files leave the English fallback in place.
+pub fn restore_language(ui: &mut crate::Ui, config: &Config) {
+    if config.language.is_empty() {
+        return;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if let Some(file) = read_i18n(&config.language) {
+            if ui.init_lang(&file, "").is_empty() {
+                ui.language = config.language.clone();
+            }
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        changeLang(format!("{}{}", LANG_BASE, config.language));
+        ui.language = config.language.clone();
+    }
+}
+
+fn remember_language(ui: &mut crate::Ui, config: &mut Config, filename: String) {
+    ui.language = filename.clone();
+    config.language = filename;
+    utils::save_config(config);
+}
+
 pub fn startup_modal(
     ctx: &egui::Context,
     shared_ui: &mut crate::Ui,
     events: &mut EventState,
-    config: &Config,
+    config: &mut Config,
 ) {
     let window = egui::Window::new("startup")
         .title_bar(false)
@@ -144,13 +212,13 @@ fn left(
                 add_thumb_tex!("skellina_icon.png", "../assets/skellina_icon.png");
 
                 let key = "skellington_icon.png";
-                let sample = utils::bin_path().join("samples").join(SKEL_SKF);
+                let sample = sample_path(SKEL_SKF);
                 let desc = shared_ui.loc("startup.skellington_sample_desc");
                 let name = "Skellington";
                 sample_button!(key, name, sample, desc);
 
                 let key = "skellina_icon.png";
-                let sample = utils::bin_path().join("samples").join(SKELA_SKF);
+                let sample = sample_path(SKELA_SKF);
                 let desc = shared_ui.loc("startup.skellina_sample_desc");
                 sample_button!(key, "Skellina", sample, desc);
             }
@@ -278,7 +346,7 @@ fn middle(
     });
 }
 
-fn right(ui: &mut egui::Ui, shared_ui: &mut crate::Ui, conf: &Config) {
+fn right(ui: &mut egui::Ui, shared_ui: &mut crate::Ui, conf: &mut Config) {
     ui.separator();
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.add_space(15.);
@@ -368,16 +436,16 @@ fn right(ui: &mut egui::Ui, shared_ui: &mut crate::Ui, conf: &Config) {
                             // change language
                             #[cfg(not(target_arch = "wasm32"))]
                             {
-                                let assets = utils::bin_path().join("assets");
-                                let file = fs::read(assets.join("i18n").join(language));
-                                if let Ok(file) = file {
-                                    shared_ui.init_lang(&file, "");
+                                if let Some(file) = read_i18n(&language) {
+                                    if shared_ui.init_lang(&file, "").is_empty() {
+                                        remember_language(shared_ui, conf, language);
+                                    }
                                 }
                             }
                             #[cfg(target_arch = "wasm32")]
                             {
-                                changeLang(format!("{}{}", LANG_BASE, language));
-                                shared_ui.language = language;
+                                changeLang(format!("{}{}", LANG_BASE, &language));
+                                remember_language(shared_ui, conf, language);
                             }
                         } else if language == str_import {
                             // open language modal if selecting 'Import'
